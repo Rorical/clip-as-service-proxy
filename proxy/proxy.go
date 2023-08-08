@@ -113,6 +113,7 @@ func (p *ClipServiceProxy) batchProcessImages(items []interface{}) {
 				Err:    err,
 			})
 		}
+		return
 	}
 
 	for i, d := range taskIds {
@@ -148,6 +149,7 @@ func (p *ClipServiceProxy) batchProcessTexts(items []interface{}) {
 				Err:    err,
 			})
 		}
+		return
 	}
 
 	for i, d := range taskIds {
