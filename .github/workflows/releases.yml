@@ -26,8 +26,8 @@ jobs:
       uses: actions/upload-artifact@v2
       with:
         name: proxyservice
-        path: target/release/proxyservice
+        path: dist/proxyservice
     - name: Create Release
       uses: ncipollo/release-action@v1.12.0
       with:
-        artifacts: target/release/proxyservice
+        artifacts: dist/proxyservice
