@@ -20,10 +20,12 @@ jobs:
 
     - name: Build
       run: go build -o dist/ proxyservice.go
-      
-    - name: Publish
-      uses: ncipollo/release-action@v1
+    - name: Upload artifact
+      uses: actions/upload-artifact@v2
       with:
-        artifacts: "./dist/*"
-        commit: "main"
-        token: ${{ secrets.GITHUB_TOKEN }}
+        name: proxyservice
+        path: target/release/proxyservice
+    - name: Create Release
+      uses: ncipollo/release-action@v1.12.0
+      with:
+        artifacts: target/release/proxyservice
