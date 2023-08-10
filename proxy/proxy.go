@@ -8,6 +8,8 @@ import (
 	"github.com/google/uuid"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
+	"math/rand"
+	"sync"
 	"time"
 )
 
@@ -16,7 +18,8 @@ var (
 )
 
 const (
-	roundRobin = 0
+	roundRobin   = 0
+	randomSelect = 1
 )
 
 const (
@@ -42,6 +45,7 @@ type ClipServiceProxy struct {
 	storage         map[string]interface{}
 	serviceType     int
 	loadBalanceMode int
+	loadBalanceLock sync.Mutex
 }
 
 func encodeImage(cli pb.EncoderClient, ctx context.Context, images [][]byte) ([][]float32, error) {
@@ -74,13 +78,18 @@ func (p *ClipServiceProxy) selectServer() pb.EncoderClient {
 	serverIndex := 0
 	switch p.loadBalanceMode {
 	case roundRobin:
+		p.loadBalanceLock.Lock()
+		defer p.loadBalanceLock.Unlock()
 		serverIndex = p.storage["lastServerIndex"].(int)
 		serverIndex += 1
 		if serverIndex >= len(p.services) {
 			serverIndex = 0
 		}
 		p.storage["lastServerIndex"] = serverIndex
+	case randomSelect:
+		serverIndex = rand.Intn(len(p.services))
 	}
+
 	return p.services[serverIndex]
 }
 
@@ -251,6 +260,7 @@ func NewClipServiceProxy(config *Config) (*ClipServiceProxy, error) {
 		serviceType:     config.ServiceType,
 		loadBalanceMode: config.LoadBalanceMode,
 		storage:         storage,
+		loadBalanceLock: sync.Mutex{},
 	}
 	p.prepareSelectServer()
 	var batchFn func(items []interface{})
