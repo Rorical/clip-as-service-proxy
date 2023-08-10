@@ -4,6 +4,8 @@ import (
 	"context"
 	pb "github.com/Rorical/clip-as-service-proxy/encoder"
 	proxy2 "github.com/Rorical/clip-as-service-proxy/proxy"
+	log "github.com/sirupsen/logrus"
+
 	"google.golang.org/grpc"
 	"net"
 )
@@ -46,6 +48,7 @@ func Serve(addr string, configPath string) error {
 	if err != nil {
 		return err
 	}
+	log.Infof("Listening at %s", addr)
 
 	config, err := proxy2.ReadConfig(configPath)
 	if err != nil {

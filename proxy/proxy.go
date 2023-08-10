@@ -6,6 +6,7 @@ import (
 	pb "github.com/Rorical/clip-as-service-proxy/encoder"
 	"github.com/Rorical/clip-as-service-proxy/utils"
 	"github.com/google/uuid"
+	log "github.com/sirupsen/logrus"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
 	"math/rand"
@@ -89,7 +90,7 @@ func (p *ClipServiceProxy) selectServer() pb.EncoderClient {
 	case randomSelect:
 		serverIndex = rand.Intn(len(p.services))
 	}
-
+	log.Debugf("Server Selected %d", serverIndex)
 	return p.services[serverIndex]
 }
 
@@ -111,7 +112,12 @@ func (p *ClipServiceProxy) batchProcessImages(items []interface{}) {
 		images[i] = req.Data.([]byte)
 		taskIds[i] = req.TaskID
 	}
+
+	log.Debugf("Batch Processing: %+v", taskIds)
+
 	s := p.selectServer()
+
+	log.Debugf("Batch Finish: %+v", taskIds)
 
 	points, err := encodeImage(s, ctx, images)
 	if err != nil {
@@ -146,9 +152,13 @@ func (p *ClipServiceProxy) batchProcessTexts(items []interface{}) {
 		taskIds[i] = req.TaskID
 	}
 
+	log.Debugf("Batch Processing: %+v", taskIds)
+
 	s := p.selectServer()
 
 	points, err := encodeText(s, ctx, texts)
+
+	log.Debugf("Batch Finish: %+v", taskIds)
 
 	if err != nil {
 		for _, d := range taskIds {
@@ -179,6 +189,7 @@ func (p *ClipServiceProxy) EncodeText(ctx context.Context, texts []string) ([][]
 	for i, d := range texts {
 		data[i] = d
 	}
+	log.Debugf("Receive EncodeTexts Request (%d)", len(texts))
 	return p.encode(ctx, data)
 }
 
@@ -190,6 +201,7 @@ func (p *ClipServiceProxy) EncodeImage(ctx context.Context, images [][]byte) ([]
 	for i, d := range images {
 		data[i] = d
 	}
+	log.Debugf("Receive EncodeImage Request (%d)", len(images))
 	return p.encode(ctx, data)
 }
 
@@ -205,6 +217,7 @@ func (p *ClipServiceProxy) encode(ctx context.Context, data []interface{}) ([][]
 		taskIds[i] = uuid.New().String()
 		taskIdsMap[taskIds[i]] = i
 	}
+	log.Debugf("Generate Tasks for Request: %+v", taskIds)
 
 	go func(batch *utils.BatchCollector, taskIds []string, data []interface{}) {
 		for i, tid := range taskIds {
@@ -212,6 +225,7 @@ func (p *ClipServiceProxy) encode(ctx context.Context, data []interface{}) ([][]
 				TaskID: tid,
 				Data:   data[i],
 			}
+			log.Debugf("Add Task: %s", tid)
 			batch.Add(req)
 		}
 	}(p.batch, taskIds, data)
@@ -225,11 +239,12 @@ func (p *ClipServiceProxy) encode(ctx context.Context, data []interface{}) ([][]
 				if res.Err != nil {
 					return nil, res.Err
 				}
-
+				log.Debugf("Gather Task Result: %s", res.TaskID)
 				resultPoints[index] = res.Point
 
 				counter -= 1
 				if counter == 0 {
+					log.Debugf("Finish Tasks and Response: %+v", taskIds)
 					return resultPoints, nil
 				}
 			}
