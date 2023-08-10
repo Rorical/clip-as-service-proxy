@@ -1,6 +1,9 @@
 package utils
 
-import "sync"
+import (
+	log "github.com/sirupsen/logrus"
+	"sync"
+)
 
 type Broadcast struct {
 	channels map[chan interface{}]struct{}
@@ -31,7 +34,13 @@ func (b *Broadcast) AddMessage(msg interface{}) {
 	defer b.mu.Unlock()
 
 	for ch := range b.channels {
-		ch <- msg
+		select {
+		case ch <- msg:
+		default:
+			delete(b.channels, ch)
+			close(ch)
+			log.Debugf("Discard Channel: %+v", ch)
+		}
 	}
 }
 

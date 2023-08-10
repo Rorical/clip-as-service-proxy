@@ -1,6 +1,7 @@
 package utils
 
 import (
+	log "github.com/sirupsen/logrus"
 	"sync"
 	"time"
 )
@@ -12,7 +13,7 @@ type BatchFunction func([]interface{})
 type BatchCollector struct {
 	batchSize int
 	ch        chan interface{}
-	timer     *time.Timer
+	ticker    *time.Ticker
 	batchFn   BatchFunction
 	mutex     sync.Mutex
 	duration  time.Duration
@@ -20,16 +21,18 @@ type BatchCollector struct {
 
 // NewBatchCollector creates a new BatchCollector with the given batch size, batch function, and timer duration.
 func NewBatchCollector(batchSize int, batchFn BatchFunction, timerDuration time.Duration) *BatchCollector {
-	timer := time.NewTimer(timerDuration)
+	ticker := time.NewTicker(timerDuration)
+
 	col := &BatchCollector{
 		batchSize: batchSize,
 		ch:        make(chan interface{}, batchSize),
-		timer:     timer,
+		ticker:    ticker,
 		batchFn:   batchFn,
 		duration:  timerDuration,
 	}
 	go func(c *BatchCollector) {
-		for range c.timer.C {
+		for range ticker.C {
+			log.Debug("Ticker Tick")
 			c.triggerBatchLocked()
 		}
 	}(col)
@@ -45,15 +48,12 @@ func (b *BatchCollector) Add(item interface{}) {
 	case b.ch <- item:
 	default:
 		// If the channel is full, trigger the batch function and reset the channel.
+		log.Debug("Channel Full Trigger")
 		b.triggerBatchLocked()
 		b.ch <- item
 	}
-	if len(b.ch) == b.batchSize {
-		// If the channel is full after adding an item, trigger the batch function and reset the channel.
-		b.triggerBatchLocked()
-	}
 
-	b.timer.Reset(b.duration)
+	b.ticker.Reset(b.duration)
 }
 
 // Stop stops the batch collector and triggers the batch function with the remaining items.
@@ -73,5 +73,5 @@ func (b *BatchCollector) triggerBatchLocked() {
 	for i := 0; i < len(batch); i++ {
 		batch[i] = <-b.ch
 	}
-	b.batchFn(batch)
+	go b.batchFn(batch)
 }

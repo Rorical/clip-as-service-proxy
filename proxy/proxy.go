@@ -117,9 +117,10 @@ func (p *ClipServiceProxy) batchProcessImages(items []interface{}) {
 
 	s := p.selectServer()
 
+	points, err := encodeImage(s, ctx, images)
+
 	log.Debugf("Batch Finish: %+v", taskIds)
 
-	points, err := encodeImage(s, ctx, images)
 	if err != nil {
 		for _, d := range taskIds {
 			p.broadcast.AddMessage(EncodeResponse{
@@ -206,7 +207,8 @@ func (p *ClipServiceProxy) EncodeImage(ctx context.Context, images [][]byte) ([]
 }
 
 func (p *ClipServiceProxy) encode(ctx context.Context, data []interface{}) ([][]float32, error) {
-	responseChannel := make(chan interface{}, len(data))
+	var responseChannel chan interface{}
+	responseChannel = make(chan interface{}, 100)
 	p.broadcast.AddChannel(responseChannel)
 	defer p.broadcast.RemoveChannel(responseChannel)
 
@@ -235,6 +237,7 @@ func (p *ClipServiceProxy) encode(ctx context.Context, data []interface{}) ([][]
 		select {
 		case rawRes := <-responseChannel:
 			res := rawRes.(EncodeResponse)
+			log.Debugf("RECEIVE: %s", res.TaskID)
 			if index, exists := taskIdsMap[res.TaskID]; exists {
 				if res.Err != nil {
 					return nil, res.Err
